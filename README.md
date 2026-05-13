@@ -38,7 +38,7 @@ MARK 拼豆智能生成器 (MARK Pixel Bead Workbench)
 🚀 快速开始
 由于本项目是纯前端开发，无需安装任何环境：
 
-访问项目网址：[https://你的用户名.github.io/你的仓库名/](https://你的用户名.github.io/你的仓库名/)
+访问项目网址： https://una-vuslat.github.io/bead-maker/
 
 在左侧上传你想要转换的图片。
 
