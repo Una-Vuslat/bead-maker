@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>MARK 拼豆专业工作台 V7.0</title>
+    <style>
+        :root { --primary: #4A90E2; --bg: #f0f2f5; --success: #28a745; --warning: #ffc107;}
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
+        .container { display: flex; gap: 20px; max-width: 1800px; margin: 0 auto; align-items: flex-start; }
+        
+        /* 侧边栏吸顶 */
+        .sidebar { 
+            width: 320px; min-width: 250px; max-width: 500px;
+            background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+            display: flex; flex-direction: column; 
+            resize: horizontal; overflow: auto;
+            position: sticky; top: 20px; height: calc(100vh - 40px);
+        }
+        h2 { font-size: 18px; margin-top: 0; color: var(--primary); border-bottom: 2px solid #eee; padding-bottom: 10px;}
+        .control-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; font-size: 14px; }
+        input[type="file"], input[type="range"], input[type="text"] { width: 100%; box-sizing: border-box; margin-top: 5px;}
+        
+        .data-tools { display: flex; gap: 5px; margin-bottom: 10px; }
+        .btn-tool { flex: 1; padding: 6px; font-size: 12px; cursor: pointer; border: 1px solid #ddd; border-radius: 4px; background: #fff; font-weight:bold; transition:0.2s;}
+        .btn-tool:hover { background: #e9ecef; }
+
+        .inventory-panels { display: flex; flex-direction: column; flex-grow: 1; overflow: hidden; gap: 10px; min-height: 300px;}
+        .panel { border: 1px solid #ddd; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; height: 50%; }
+        .panel-header { background: #f8f9fa; padding: 8px; font-size: 13px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .color-list { overflow-y: auto; padding: 5px; flex-grow: 1; background: white;}
+        .color-item { display: flex; align-items: center; padding: 4px; font-size: 12px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
+        .color-item:hover { background: #f4f6f8; }
+        .color-box { width: 14px; height: 14px; border-radius: 3px; margin: 0 8px; border: 1px solid #ccc; }
+        
+        /* 工作区 */
+        .workspace { flex-grow: 1; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+        .btn-main { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; flex-shrink: 0;}
+        .btn-main:hover { background: #357abd; }
+        
+        .canvas-wrapper { display: flex; flex-direction: column; gap: 20px; }
+        
+        .canvas-box { 
+            width: 100%; 
+            background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+            display: flex; flex-direction: column;
+            border: 1px solid #e0e0e0; box-sizing: border-box;
+        }
+        .canvas-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px dashed #eee; padding-bottom: 10px;}
+        .header-actions { display: flex; gap: 6px; align-items: center;}
+        
+        /* 缩放控制器样式 */
+        .zoom-controls { display: flex; align-items: center; background: #f1f3f5; border-radius: 6px; overflow: hidden; border: 1px solid #ddd; margin-right: 10px;}
+        .btn-zoom { background: transparent; border: none; padding: 6px 10px; cursor: pointer; font-weight: bold; font-size: 14px; color: #555; transition: 0.2s; }
+        .btn-zoom:hover { background: #dee2e6; }
+        .zoom-text { font-size: 12px; font-weight: bold; width: 45px; text-align: center; color: #333; }
+        
+        .btn-download { background: var(--success); color: white; border: none; padding: 8px 15px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; }
+        
+        /* 滚动视窗 */
+        .scroll-area {
+            width: 100%;
+            height: 55vh; /* 给予充足的高度 */
+            overflow: auto; /* 超出区域自动出现滚动条 */
+            background: #e9ecef;
+            border-radius: 6px;
+            text-align: center; 
+            padding: 15px; 
+            box-sizing: border-box;
+            margin-bottom: 15px;
+            /* 居中显示 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        canvas { 
+            background: white; 
+            box-shadow: 0 0 10px rgba(0,0,0,0.1); 
+            /* 关键点：取消 maxWidth，通过 JS 强行控制 css width 来实现缩放 */
+            transform-origin: center center;
+            transition: width 0.2s ease, height 0.2s ease;
+        }
+        
+        .legend-inline { border-top: 1px solid #eee; padding-top: 15px; }
+        .legend-container { display: flex; flex-wrap: wrap; gap: 8px; max-height: 200px; overflow-y: auto;}
+        .legend-item { display: flex; align-items: center; background: #f8f9fa; border: 1px solid #ddd; padding: 4px 10px; border-radius: 20px; font-size: 11px; cursor: pointer; }
+        .legend-item:hover { background: #e9ecef; }
+        .legend-item.active { background: #fff3cd; border-color: #ffc107; font-weight: bold; box-shadow: 0 0 5px rgba(255,193,7,0.5);}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="sidebar">
+        <h2>🛠️ 生成设置</h2>
+        <div class="control-group">
+            <label>1. 上传图片</label>
+            <input type="file" id="upload" accept="image/*">
+        </div>
+        <div class="control-group">
+            <label>2. 颗粒数: <span id="gridVal">65</span></label>
+            <input type="range" id="gridSize" min="20" max="150" value="65" oninput="document.getElementById('gridVal').innerText = this.value">
+        </div>
+        
+        <h2>🎨 色号管理</h2>
+        <div class="data-tools">
+            <button class="btn-tool" onclick="exportInventory()">📤 导出配置</button>
+            <button class="btn-tool" onclick="document.getElementById('importFile').click()">📥 导入配置</button>
+            <input type="file" id="importFile" style="display:none" accept=".json" onchange="importInventory(event)">
+        </div>
+
+        <div class="inventory-panels">
+            <div class="panel">
+                <div class="panel-header">
+                    <span>全色号库 (➕添加)</span>
+                    <input type="text" id="searchAll" placeholder="搜索..." style="width: 60px;" oninput="renderLists()">
+                </div>
+                <div class="color-list" id="all-colors-list"></div>
+            </div>
+            
+            <div class="panel" style="border-color: var(--primary);">
+                <div class="panel-header" style="background: #e3f2fd; color: var(--primary);">
+                    <span>我的库存 (<span id="myCount">0</span>)</span>
+                    <button onclick="clearMyInventory()" style="font-size:10px;">清空</button>
+                </div>
+                <div class="color-list" id="my-colors-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="workspace">
+        <button class="btn-main" onclick="generate()">🚀 一键生成专业拼豆图纸</button>
+        
+        <div class="canvas-wrapper">
+            <div class="canvas-box">
+                <div class="canvas-header">
+                    <h3 style="margin: 0;">👑 标准图纸 (原图直出)</h3>
+                    <div class="header-actions">
+                        <button class="btn-tool" style="margin:0; padding:6px 12px;" onclick="fitToScreen('standardCanvas')">👁️ 适应视图</button>
+                        <div class="zoom-controls">
+                            <button class="btn-zoom" onclick="zoomCanvas('standardCanvas', -0.2)">➖</button>
+                            <span class="zoom-text" id="zoom-txt-standard">100%</span>
+                            <button class="btn-zoom" onclick="zoomCanvas('standardCanvas', 0.2)">➕</button>
+                        </div>
+                        <button class="btn-download" onclick="downloadCanvasWithLegend('standardCanvas', 'standard', '标准版图纸及清单.png')">💾 导出高清图纸</button>
+                    </div>
+                </div>
+                <div class="scroll-area" id="scroll-standardCanvas">
+                    <canvas id="standardCanvas"></canvas>
+                </div>
+                <div class="legend-inline">
+                    <b>🖱️ 互动清单：</b>
+                    <div class="legend-container" id="legend-standard"><span style="color:#999; font-size:12px;">生成后显示...</span></div>
+                </div>
+            </div>
+            
+            <div class="canvas-box">
+                <div class="canvas-header">
+                    <h3 style="margin: 0; color: var(--primary);">📦 我的库存版 (智能替换)</h3>
+                    <div class="header-actions">
+                        <button class="btn-tool" style="margin:0; padding:6px 12px;" onclick="fitToScreen('customCanvas')">👁️ 适应视图</button>
+                        <div class="zoom-controls">
+                            <button class="btn-zoom" onclick="zoomCanvas('customCanvas', -0.2)">➖</button>
+                            <span class="zoom-text" id="zoom-txt-custom">100%</span>
+                            <button class="btn-zoom" onclick="zoomCanvas('customCanvas', 0.2)">➕</button>
+                        </div>
+                        <button class="btn-download" onclick="downloadCanvasWithLegend('customCanvas', 'custom', '库存版图纸及清单.png')">💾 导出高清图纸</button>
+                    </div>
+                </div>
+                <div class="scroll-area" id="scroll-customCanvas">
+                    <canvas id="customCanvas"></canvas>
+                </div>
+                <div class="legend-inline">
+                    <b>🖱️ 互动清单：</b>
+                    <div class="legend-container" id="legend-custom"><span style="color:#999; font-size:12px;">生成后显示...</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// --- [数据库：完整 291 色] ---
+const COLOR_DB = [{"id":"A1","rgb":[250,244,200],"hex":"#FAF4C8"},{"id":"A2","rgb":[255,255,213],"hex":"#FFFFD5"},{"id":"A3","rgb":[254,255,139],"hex":"#FEFF8B"},{"id":"A4","rgb":[251,237,86],"hex":"#FBED56"},{"id":"A5","rgb":[244,215,56],"hex":"#F4D738"},{"id":"A6","rgb":[254,172,76],"hex":"#FEAC4C"},{"id":"A7","rgb":[254,139,76],"hex":"#FE8B4C"},{"id":"A8","rgb":[255,218,69],"hex":"#FFDA45"},{"id":"A9","rgb":[255,153,91],"hex":"#FF995B"},{"id":"A10","rgb":[247,124,49],"hex":"#F77C31"},{"id":"A11","rgb":[255,221,153],"hex":"#FFDD99"},{"id":"A12","rgb":[254,159,114],"hex":"#FE9F72"},{"id":"A13","rgb":[255,195,101],"hex":"#FFC365"},{"id":"A14","rgb":[253,84,61],"hex":"#FD543D"},{"id":"A15","rgb":[255,243,101],"hex":"#FFF365"},{"id":"A16","rgb":[255,255,159],"hex":"#FFFF9F"},{"id":"A17","rgb":[255,227,110],"hex":"#FFE36E"},{"id":"A18","rgb":[254,190,125],"hex":"#FEBE7D"},{"id":"A19","rgb":[253,124,114],"hex":"#FD7C72"},{"id":"A20","rgb":[255,213,104],"hex":"#FFD568"},{"id":"A21","rgb":[255,227,149],"hex":"#FFE395"},{"id":"A22","rgb":[244,245,125],"hex":"#F4F57D"},{"id":"A23","rgb":[230,201,183],"hex":"#E6C9B7"},{"id":"A24","rgb":[247,248,162],"hex":"#F7F8A2"},{"id":"A25","rgb":[255,214,125],"hex":"#FFD67D"},{"id":"A26","rgb":[255,200,48],"hex":"#FFC830"},{"id":"B1","rgb":[230,238,49],"hex":"#E6EE31"},{"id":"B2","rgb":[99,243,71],"hex":"#63F347"},{"id":"B3","rgb":[158,247,128],"hex":"#9EF780"},{"id":"B4","rgb":[93,224,53],"hex":"#5DE035"},{"id":"B5","rgb":[53,227,82],"hex":"#35E352"},{"id":"B6","rgb":[101,226,166],"hex":"#65E2A6"},{"id":"B7","rgb":[61,175,128],"hex":"#3DAF80"},{"id":"B8","rgb":[28,156,79],"hex":"#1C9C4F"},{"id":"B9","rgb":[39,82,58],"hex":"#27523A"},{"id":"B10","rgb":[149,211,194],"hex":"#95D3C2"},{"id":"B11","rgb":[93,114,42],"hex":"#5D722A"},{"id":"B12","rgb":[22,111,65],"hex":"#166F41"},{"id":"B13","rgb":[202,235,123],"hex":"#CAEB7B"},{"id":"B14","rgb":[173,233,70],"hex":"#ADE946"},{"id":"B15","rgb":[46,81,50],"hex":"#2E5132"},{"id":"B16","rgb":[197,237,156],"hex":"#C5ED9C"},{"id":"B17","rgb":[155,177,58],"hex":"#9BB13A"},{"id":"B18","rgb":[230,238,73],"hex":"#E6EE49"},{"id":"B19","rgb":[36,184,140],"hex":"#24B88C"},{"id":"B20","rgb":[194,240,204],"hex":"#C2F0CC"},{"id":"B21","rgb":[21,106,107],"hex":"#156A6B"},{"id":"B22","rgb":[11,60,67],"hex":"#0B3C43"},{"id":"B23","rgb":[48,58,33],"hex":"#303A21"},{"id":"B24","rgb":[238,252,165],"hex":"#EEFCA5"},{"id":"B25","rgb":[78,132,109],"hex":"#4E846D"},{"id":"B26","rgb":[141,122,53],"hex":"#8D7A35"},{"id":"B27","rgb":[204,225,175],"hex":"#CCE1AF"},{"id":"B28","rgb":[158,229,185],"hex":"#9EE5B9"},{"id":"B29","rgb":[197,226,84],"hex":"#C5E254"},{"id":"B30","rgb":[226,252,177],"hex":"#E2FCB1"},{"id":"B31","rgb":[176,231,146],"hex":"#B0E792"},{"id":"B32","rgb":[156,171,90],"hex":"#9CAB5A"},{"id":"C1","rgb":[232,255,231],"hex":"#E8FFE7"},{"id":"C2","rgb":[169,249,252],"hex":"#A9F9FC"},{"id":"C3","rgb":[160,226,251],"hex":"#A0E2FB"},{"id":"C4","rgb":[65,204,255],"hex":"#41CCFF"},{"id":"C5","rgb":[1,172,235],"hex":"#01ACEB"},{"id":"C6","rgb":[80,170,240],"hex":"#50AAF0"},{"id":"C7","rgb":[54,119,210],"hex":"#3677D2"},{"id":"C8","rgb":[15,84,192],"hex":"#0F54C0"},{"id":"C9","rgb":[50,75,202],"hex":"#324BCA"},{"id":"C10","rgb":[62,188,226],"hex":"#3EBCE2"},{"id":"C11","rgb":[40,221,222],"hex":"#28DDDE"},{"id":"C12","rgb":[28,51,77],"hex":"#1C334D"},{"id":"C13","rgb":[205,232,255],"hex":"#CDE8FF"},{"id":"C14","rgb":[213,253,255],"hex":"#D5FDFF"},{"id":"C15","rgb":[34,196,198],"hex":"#22C4C6"},{"id":"C16","rgb":[21,87,168],"hex":"#1557A8"},{"id":"C17","rgb":[4,209,246],"hex":"#04D1F6"},{"id":"C18","rgb":[29,51,68],"hex":"#1D3344"},{"id":"C19","rgb":[24,135,162],"hex":"#1887A2"},{"id":"C20","rgb":[23,109,175],"hex":"#176DAF"},{"id":"C21","rgb":[190,221,255],"hex":"#BEDDFF"},{"id":"C22","rgb":[103,180,190],"hex":"#67B4BE"},{"id":"C23","rgb":[200,226,255],"hex":"#C8E2FF"},{"id":"C24","rgb":[124,196,255],"hex":"#7CC4FF"},{"id":"C25","rgb":[169,229,229],"hex":"#A9E5E5"},{"id":"C26","rgb":[60,174,216],"hex":"#3CAED8"},{"id":"C27","rgb":[211,223,250],"hex":"#D3DFFA"},{"id":"C28","rgb":[187,207,237],"hex":"#BBCFED"},{"id":"C29","rgb":[52,72,142],"hex":"#34488E"},{"id":"D1","rgb":[174,180,242],"hex":"#AEB4F2"},{"id":"D2","rgb":[133,142,221],"hex":"#858EDD"},{"id":"D3","rgb":[47,84,175],"hex":"#2F54AF"},{"id":"D4","rgb":[24,42,132],"hex":"#182A84"},{"id":"D5","rgb":[184,67,197],"hex":"#B843C5"},{"id":"D6","rgb":[172,123,222],"hex":"#AC7BDE"},{"id":"D7","rgb":[136,84,179],"hex":"#8854B3"},{"id":"D8","rgb":[226,211,255],"hex":"#E2D3FF"},{"id":"D9","rgb":[213,185,248],"hex":"#D5B9F8"},{"id":"D10","rgb":[54,24,81],"hex":"#361851"},{"id":"D11","rgb":[185,186,225],"hex":"#B9BAE1"},{"id":"D12","rgb":[222,154,212],"hex":"#DE9AD4"},{"id":"D13","rgb":[185,0,149],"hex":"#B90095"},{"id":"D14","rgb":[139,39,155],"hex":"#8B279B"},{"id":"D15","rgb":[47,31,144],"hex":"#2F1F90"},{"id":"D16","rgb":[227,225,238],"hex":"#E3E1EE"},{"id":"D17","rgb":[196,212,246],"hex":"#C4D4F6"},{"id":"D18","rgb":[164,94,199],"hex":"#A45EC7"},{"id":"D19","rgb":[216,195,215],"hex":"#D8C3D7"},{"id":"D20","rgb":[156,50,178],"hex":"#9C32B2"},{"id":"D21","rgb":[154,0,155],"hex":"#9A009B"},{"id":"D22","rgb":[51,58,149],"hex":"#333A95"},{"id":"D23","rgb":[235,218,252],"hex":"#EBDAFC"},{"id":"D24","rgb":[119,134,229],"hex":"#7786E5"},{"id":"D25","rgb":[73,79,199],"hex":"#494FC7"},{"id":"D26","rgb":[223,194,248],"hex":"#DFC2F8"},{"id":"E1","rgb":[253,211,204],"hex":"#FDD3CC"},{"id":"E2","rgb":[254,192,223],"hex":"#FEC0DF"},{"id":"E3","rgb":[255,183,231],"hex":"#FFB7E7"},{"id":"E4","rgb":[232,100,158],"hex":"#E8649E"},{"id":"E5","rgb":[245,81,162],"hex":"#F551A2"},{"id":"E6","rgb":[241,61,116],"hex":"#F13D74"},{"id":"E7","rgb":[198,52,120],"hex":"#C63478"},{"id":"E8","rgb":[255,219,233],"hex":"#FFDBE9"},{"id":"E9","rgb":[233,112,204],"hex":"#E970CC"},{"id":"E10","rgb":[211,55,147],"hex":"#D33793"},{"id":"E11","rgb":[252,221,210],"hex":"#FCDDD2"},{"id":"E12","rgb":[247,143,195],"hex":"#F78FC3"},{"id":"E13","rgb":[181,0,109],"hex":"#B5006D"},{"id":"E14","rgb":[255,209,186],"hex":"#FFD1BA"},{"id":"E15","rgb":[248,199,201],"hex":"#F8C7C9"},{"id":"E16","rgb":[255,243,235],"hex":"#FFF3EB"},{"id":"E17","rgb":[255,226,234],"hex":"#FFE2EA"},{"id":"E18","rgb":[255,199,219],"hex":"#FFC7DB"},{"id":"E19","rgb":[254,186,213],"hex":"#FEBAD5"},{"id":"E20","rgb":[216,199,209],"hex":"#D8C7D1"},{"id":"E21","rgb":[189,157,161],"hex":"#BD9DA1"},{"id":"E22","rgb":[183,133,161],"hex":"#B785A1"},{"id":"E23","rgb":[147,122,141],"hex":"#937A8D"},{"id":"E24","rgb":[225,188,232],"hex":"#E1BCE8"},{"id":"F1","rgb":[253,149,123],"hex":"#FD957B"},{"id":"F2","rgb":[252,61,70],"hex":"#FC3D46"},{"id":"F3","rgb":[247,73,65],"hex":"#F74941"},{"id":"F4","rgb":[252,40,60],"hex":"#FC283C"},{"id":"F5","rgb":[231,0,47],"hex":"#E7002F"},{"id":"F6","rgb":[148,54,48],"hex":"#943630"},{"id":"F7","rgb":[151,25,55],"hex":"#971937"},{"id":"F8","rgb":[188,0,40],"hex":"#BC0028"},{"id":"F9","rgb":[226,103,122],"hex":"#E2677A"},{"id":"F10","rgb":[138,69,38],"hex":"#8A4526"},{"id":"F11","rgb":[90,33,33],"hex":"#5A2121"},{"id":"F12","rgb":[253,78,106],"hex":"#FD4E6A"},{"id":"F13","rgb":[243,87,68],"hex":"#F35744"},{"id":"F14","rgb":[255,169,173],"hex":"#FFA9AD"},{"id":"F15","rgb":[211,0,34],"hex":"#D30022"},{"id":"F16","rgb":[254,194,166],"hex":"#FEC2A6"},{"id":"F17","rgb":[230,156,121],"hex":"#E69C79"},{"id":"F18","rgb":[211,124,70],"hex":"#D37C46"},{"id":"F19","rgb":[193,68,74],"hex":"#C1444A"},{"id":"F20","rgb":[205,147,145],"hex":"#CD9391"},{"id":"F21","rgb":[247,180,198],"hex":"#F7B4C6"},{"id":"F22","rgb":[253,192,208],"hex":"#FDC0D0"},{"id":"F23","rgb":[246,126,102],"hex":"#F67E66"},{"id":"F24","rgb":[230,152,170],"hex":"#E698AA"},{"id":"F25","rgb":[229,75,79],"hex":"#E54B4F"},{"id":"G1","rgb":[255,226,206],"hex":"#FFE2CE"},{"id":"G2","rgb":[255,196,170],"hex":"#FFC4AA"},{"id":"G3","rgb":[244,195,165],"hex":"#F4C3A5"},{"id":"G4","rgb":[225,179,131],"hex":"#E1B383"},{"id":"G5","rgb":[237,176,69],"hex":"#EDB045"},{"id":"G6","rgb":[233,156,23],"hex":"#E99C17"},{"id":"G7","rgb":[157,91,62],"hex":"#9D5B3E"},{"id":"G8","rgb":[117,56,50],"hex":"#753832"},{"id":"G9","rgb":[230,180,131],"hex":"#E6B483"},{"id":"G10","rgb":[217,140,57],"hex":"#D98C39"},{"id":"G11","rgb":[224,197,147],"hex":"#E0C593"},{"id":"G12","rgb":[255,200,144],"hex":"#FFC890"},{"id":"G13","rgb":[183,113,74],"hex":"#B7714A"},{"id":"G14","rgb":[141,97,76],"hex":"#8D614C"},{"id":"G15","rgb":[252,249,224],"hex":"#FCF9E0"},{"id":"G16","rgb":[242,217,186],"hex":"#F2D9BA"},{"id":"G17","rgb":[120,82,75],"hex":"#78524B"},{"id":"G18","rgb":[255,228,204],"hex":"#FFE4CC"},{"id":"G19","rgb":[224,121,53],"hex":"#E07935"},{"id":"G20","rgb":[169,64,35],"hex":"#A94023"},{"id":"G21","rgb":[184,133,88],"hex":"#B88558"},{"id":"H1","rgb":[253,251,255],"hex":"#FDFBFF"},{"id":"H2","rgb":[254,255,255],"hex":"#FEFFFF"},{"id":"H3","rgb":[182,177,186],"hex":"#B6B1BA"},{"id":"H4","rgb":[137,133,140],"hex":"#89858C"},{"id":"H5","rgb":[72,70,78],"hex":"#48464E"},{"id":"H6","rgb":[47,43,47],"hex":"#2F2B2F"},{"id":"H7","rgb":[0,0,0],"hex":"#000000"},{"id":"H8","rgb":[231,214,219],"hex":"#E7D6DB"},{"id":"H9","rgb":[237,237,237],"hex":"#EDEDED"},{"id":"H10","rgb":[238,233,234],"hex":"#EEE9EA"},{"id":"H11","rgb":[206,205,213],"hex":"#CECDD5"},{"id":"H12","rgb":[255,245,237],"hex":"#FFF5ED"},{"id":"H13","rgb":[245,236,210],"hex":"#F5ECD2"},{"id":"H14","rgb":[207,215,211],"hex":"#CFD7D3"},{"id":"H15","rgb":[152,166,168],"hex":"#98A6A8"},{"id":"H16","rgb":[29,20,20],"hex":"#1D1414"},{"id":"H17","rgb":[241,237,237],"hex":"#F1EDED"},{"id":"H18","rgb":[255,253,240],"hex":"#FFFDF0"},{"id":"H19","rgb":[246,239,226],"hex":"#F6EFE2"},{"id":"H20","rgb":[148,159,163],"hex":"#949FA3"},{"id":"H21","rgb":[255,251,225],"hex":"#FFFBE1"},{"id":"H22","rgb":[202,202,212],"hex":"#CACAD4"},{"id":"H23","rgb":[154,157,148],"hex":"#9A9D94"},{"id":"M1","rgb":[188,198,184],"hex":"#BCC6B8"},{"id":"M2","rgb":[138,163,134],"hex":"#8AA386"},{"id":"M3","rgb":[105,125,128],"hex":"#697D80"},{"id":"M4","rgb":[227,210,188],"hex":"#E3D2BC"},{"id":"M5","rgb":[208,204,170],"hex":"#D0CCAA"},{"id":"M6","rgb":[176,167,130],"hex":"#B0A782"},{"id":"M7","rgb":[180,164,151],"hex":"#B4A497"},{"id":"M8","rgb":[179,130,129],"hex":"#B38281"},{"id":"M9","rgb":[165,135,103],"hex":"#A58767"},{"id":"M10","rgb":[197,178,188],"hex":"#C5B2BC"},{"id":"M11","rgb":[159,117,148],"hex":"#9F7594"},{"id":"M12","rgb":[100,71,73],"hex":"#644749"},{"id":"M13","rgb":[209,144,102],"hex":"#D19066"},{"id":"M14","rgb":[199,115,98],"hex":"#C77362"},{"id":"M15","rgb":[117,125,120],"hex":"#757D78"},{"id":"P1","rgb":[252,247,248],"hex":"#FCF7F8"},{"id":"P2","rgb":[176,169,172],"hex":"#B0A9AC"},{"id":"P3","rgb":[175,220,171],"hex":"#AFDCAB"},{"id":"P4","rgb":[254,164,159],"hex":"#FEA49F"},{"id":"P5","rgb":[238,140,62],"hex":"#EE8C3E"},{"id":"P6","rgb":[95,208,167],"hex":"#5FD0A7"},{"id":"P7","rgb":[235,146,112],"hex":"#EB9270"},{"id":"P8","rgb":[240,217,88],"hex":"#F0D958"},{"id":"P9","rgb":[217,217,217],"hex":"#D9D9D9"},{"id":"P10","rgb":[217,199,234],"hex":"#D9C7EA"},{"id":"P11","rgb":[243,236,201],"hex":"#F3ECC9"},{"id":"P12","rgb":[230,238,242],"hex":"#E6EEF2"},{"id":"P13","rgb":[170,203,239],"hex":"#AACBEF"},{"id":"P14","rgb":[51,118,128],"hex":"#337680"},{"id":"P15","rgb":[102,133,117],"hex":"#668575"},{"id":"P16","rgb":[254,191,69],"hex":"#FEBF45"},{"id":"P17","rgb":[254,163,36],"hex":"#FEA324"},{"id":"P18","rgb":[254,184,159],"hex":"#FEB89F"},{"id":"P19","rgb":[255,254,236],"hex":"#FFFEE8"},{"id":"P20","rgb":[254,190,207],"hex":"#FEBECF"},{"id":"P21","rgb":[236,190,191],"hex":"#ECBEBF"},{"id":"P22","rgb":[228,168,159],"hex":"#E4A89F"},{"id":"P23","rgb":[165,98,104],"hex":"#A56268"},{"id":"Q1","rgb":[242,165,232],"hex":"#F2A5E8"},{"id":"Q2","rgb":[233,236,145],"hex":"#E9EC91"},{"id":"Q3","rgb":[255,255,0],"hex":"#FFFF00"},{"id":"Q4","rgb":[255,235,250],"hex":"#FFEBFA"},{"id":"Q5","rgb":[118,206,222],"hex":"#76CEDE"},{"id":"R1","rgb":[213,13,33],"hex":"#D50D21"},{"id":"R2","rgb":[249,47,131],"hex":"#F92F83"},{"id":"R3","rgb":[253,131,36],"hex":"#FD8324"},{"id":"R4","rgb":[248,236,49],"hex":"#F8EC31"},{"id":"R5","rgb":[53,199,91],"hex":"#35C75B"},{"id":"R6","rgb":[35,136,145],"hex":"#238891"},{"id":"R7","rgb":[25,119,157],"hex":"#19779D"},{"id":"R8","rgb":[26,96,195],"hex":"#1A60C3"},{"id":"R9","rgb":[154,86,180],"hex":"#9A56B4"},{"id":"R10","rgb":[255,219,76],"hex":"#FFDB4C"},{"id":"R11","rgb":[255,235,250],"hex":"#FFEBFA"},{"id":"R12","rgb":[216,213,206],"hex":"#D8D5CE"},{"id":"R13","rgb":[85,81,76],"hex":"#55514C"},{"id":"R14","rgb":[159,228,223],"hex":"#9FE4DF"},{"id":"R15","rgb":[119,206,233],"hex":"#77CEE9"},{"id":"R16","rgb":[62,207,202],"hex":"#3ECFCA"},{"id":"R17","rgb":[74,134,122],"hex":"#4A867A"},{"id":"R18","rgb":[127,205,157],"hex":"#7FCD9D"},{"id":"R19","rgb":[205,229,93],"hex":"#CDE55D"},{"id":"R20","rgb":[232,199,180],"hex":"#E8C7B4"},{"id":"R21","rgb":[173,111,60],"hex":"#AD6F3C"},{"id":"R22","rgb":[108,55,47],"hex":"#6C372F"},{"id":"R23","rgb":[254,184,114],"hex":"#FEB872"},{"id":"R24","rgb":[243,193,192],"hex":"#F3C1C0"},{"id":"R25","rgb":[201,103,94],"hex":"#C9675E"},{"id":"R26","rgb":[210,147,190],"hex":"#D293BE"},{"id":"R27","rgb":[234,140,177],"hex":"#EA8CB1"},{"id":"R28","rgb":[156,135,214],"hex":"#9C87D6"},{"id":"T1","rgb":[255,255,255],"hex":"#FFFFFF"},{"id":"Y1","rgb":[253,111,180],"hex":"#FD6FB4"},{"id":"Y2","rgb":[254,180,129],"hex":"#FEB481"},{"id":"Y3","rgb":[215,250,160],"hex":"#D7FAA0"},{"id":"Y4","rgb":[139,219,250],"hex":"#8BDBFA"},{"id":"Y5","rgb":[233,135,234],"hex":"#E987EA"},{"id":"ZG1","rgb":[218,171,179],"hex":"#DAABB3"},{"id":"ZG2","rgb":[214,170,135],"hex":"#D6AA87"},{"id":"ZG3","rgb":[193,189,141],"hex":"#C1BD8D"},{"id":"ZG4","rgb":[150,134,159],"hex":"#96869F"},{"id":"ZG5","rgb":[132,144,166],"hex":"#8490A6"},{"id":"ZG6","rgb":[148,191,226],"hex":"#94BFE2"},{"id":"ZG7","rgb":[226,169,210],"hex":"#E2A9D2"},{"id":"ZG8","rgb":[171,145,192],"hex":"#AB91C0"}];
+
+// ================== 核心色彩空间升级 (RGB 转 LAB) ==================
+function rgbToLab(rgb) {
+    let r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255;
+    r = r > 0.04045 ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
+    g = g > 0.04045 ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
+    b = b > 0.04045 ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
+    let x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
+    let y = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 1.00000;
+    let z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
+    x = x > 0.008856 ? Math.pow(x, 1/3) : (7.787 * x) + 16/116;
+    y = y > 0.008856 ? Math.pow(y, 1/3) : (7.787 * y) + 16/116;
+    z = z > 0.008856 ? Math.pow(z, 1/3) : (7.787 * z) + 16/116;
+    return [(116 * y) - 16, 500 * (x - y), 200 * (y - z)];
+}
+
+// 网页加载时，预先计算并存储所有颜色的 LAB 值
+COLOR_DB.forEach(color => {
+    color.lab = rgbToLab(color.rgb);
+});
+
+let myInventory = new Set(JSON.parse(localStorage.getItem('myBeads')) || []);
+let generatedData = { standard: [], custom: [], width: 0, height: 0 };
+let currentHighlight = null;
+let statsGlobalStd = {};
+let statsGlobalCst = {};
+let currentZoom = { 'standardCanvas': 1, 'customCanvas': 1 };
+
+// ================== 备份 ==================
+function exportInventory() {
+    const data = JSON.stringify([...myInventory]);
+    const blob = new Blob([data], {type: "application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = "mark_beads_inventory.json"; a.click();
+}
+function importInventory(event) {
+    const file = event.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try { myInventory = new Set(JSON.parse(e.target.result)); saveAndRender(); alert("✅ 库存导入成功！"); } 
+        catch(err) { alert("❌ 文件格式错误！"); }
+    };
+    reader.readAsText(file);
+}
+
+function renderLists() {
+    const searchTxt = document.getElementById('searchAll').value.toUpperCase();
+    const allList = document.getElementById('all-colors-list'); const myList = document.getElementById('my-colors-list');
+    allList.innerHTML = ''; myList.innerHTML = '';
+    
+    COLOR_DB.forEach(color => {
+        const itemHTML = `<div class="color-box" style="background:${color.hex}"></div><span>${color.id}</span>`;
+        if (myInventory.has(color.id)) {
+            const div = document.createElement('div'); div.className = 'color-item';
+            div.innerHTML = `<span style="color:red; font-weight:bold;">➖</span>` + itemHTML;
+            div.onclick = () => { myInventory.delete(color.id); saveAndRender(); };
+            myList.appendChild(div);
+        } else {
+            if(color.id.includes(searchTxt)) {
+                const div = document.createElement('div'); div.className = 'color-item';
+                div.innerHTML = `<span style="color:green; font-weight:bold;">➕</span>` + itemHTML;
+                div.onclick = () => { myInventory.add(color.id); saveAndRender(); };
+                allList.appendChild(div);
+            }
+        }
+    });
+    document.getElementById('myCount').innerText = myInventory.size;
+}
+
+function saveAndRender() { localStorage.setItem('myBeads', JSON.stringify([...myInventory])); renderLists(); }
+function clearMyInventory() { if(confirm("确定要清空吗？")) { myInventory.clear(); saveAndRender(); } }
+
+// ================== 渲染引擎 ==================
+const CELL_SIZE = 25; const AXIS_PADDING = 30;
+
+function getContrastYIQ(hex) {
+    hex = hex.replace("#", ""); const r = parseInt(hex.substr(0,2),16), g = parseInt(hex.substr(2,2),16), b = parseInt(hex.substr(4,2),16);
+    return ((r*299)+(g*587)+(b*114))/1000 >= 128 ? '#000000' : '#FFFFFF';
+}
+
+function getClosestColor(r, g, b, palette) {
+    // 将图片当前像素转换为 LAB 空间
+    const targetLab = rgbToLab([r, g, b]);
+    let minDiff = Infinity, bestMatch = palette[0];
+    
+    for (const color of palette) {
+        // 使用 CIE76 公式计算视觉色差
+        const dL = targetLab[0] - color.lab[0];
+        const da = targetLab[1] - color.lab[1];
+        const db = targetLab[2] - color.lab[2];
+        const diff = dL * dL + da * da + db * db;
+        
+        if (diff < minDiff) { 
+            minDiff = diff; 
+            bestMatch = color; 
+        }
+    }
+    return bestMatch;
+}
+
+function drawGrid(canvasId, dataArray) {
+    const canvas = document.getElementById(canvasId); 
+    
+    // 重置尺寸防止读取错误
+    canvas.style.width = ''; 
+    canvas.style.height = '';
+    
+    const ctx = canvas.getContext('2d');
+    const W = generatedData.width, H = generatedData.height;
+    
+    canvas.width = W * CELL_SIZE + AXIS_PADDING; 
+    canvas.height = H * CELL_SIZE + AXIS_PADDING;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = "#e3f2fd"; ctx.fillRect(0, 0, AXIS_PADDING, canvas.height); ctx.fillRect(0, H * CELL_SIZE, canvas.width, AXIS_PADDING);
+    
+    ctx.fillStyle = "#333"; ctx.font = "bold 11px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for(let x=0; x<W; x++) ctx.fillText(x + 1, AXIS_PADDING + x * CELL_SIZE + CELL_SIZE/2, H * CELL_SIZE + AXIS_PADDING/2);
+    for(let y=0; y<H; y++) ctx.fillText(H - y, AXIS_PADDING/2, y * CELL_SIZE + CELL_SIZE/2);
+    
+    ctx.font = "bold 10px Arial";
+    for(let y=0; y<H; y++) {
+        for(let x=0; x<W; x++) {
+            const colorObj = dataArray[y * W + x]; if(!colorObj) continue;
+            const px = AXIS_PADDING + x * CELL_SIZE, py = y * CELL_SIZE;
+            
+            ctx.globalAlpha = (currentHighlight !== null && colorObj.id !== currentHighlight) ? 0.15 : 1.0;
+            ctx.fillStyle = colorObj.hex; ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
+            ctx.strokeStyle = "rgba(0,0,0,0.2)"; ctx.strokeRect(px, py, CELL_SIZE, CELL_SIZE);
+            ctx.fillStyle = getContrastYIQ(colorObj.hex); ctx.fillText(colorObj.id, px + CELL_SIZE/2, py + CELL_SIZE/2);
+        }
+    }
+    ctx.globalAlpha = 1.0;
+}
+
+function buildLegend() {
+    const stdDiv = document.getElementById('legend-standard'); const cstDiv = document.getElementById('legend-custom');
+    stdDiv.innerHTML = ''; cstDiv.innerHTML = '';
+    statsGlobalStd = {}; statsGlobalCst = {};
+    
+    generatedData.standard.forEach(c => { if(c) statsGlobalStd[c.id] = (statsGlobalStd[c.id] || 0) + 1; });
+    generatedData.custom.forEach(c => { if(c) statsGlobalCst[c.id] = (statsGlobalCst[c.id] || 0) + 1; });
+    
+    const renderLegend = (stats, container) => {
+        Object.entries(stats).sort((a,b)=>b[1]-a[1]).forEach(([id, count]) => {
+            const hex = COLOR_DB.find(c=>c.id===id).hex;
+            const item = document.createElement('div');
+            item.className = 'legend-item'; item.setAttribute('data-tid', id);
+            if(currentHighlight === id) item.classList.add('active');
+            item.innerHTML = `<div class="color-box" style="background:${hex}; margin-left:0;"></div><b>${id}</b>(${count})`;
+            item.onclick = () => {
+                currentHighlight = (currentHighlight === id) ? null : id;
+                document.querySelectorAll('.legend-item').forEach(el => el.classList.remove('active'));
+                if(currentHighlight) document.querySelectorAll(`.legend-item[data-tid="${id}"]`).forEach(el => el.classList.add('active'));
+                drawGrid('standardCanvas', generatedData.standard); 
+                drawGrid('customCanvas', generatedData.custom);
+                // 重新应用缩放比例
+                applyZoom('standardCanvas', currentZoom['standardCanvas']);
+                applyZoom('customCanvas', currentZoom['customCanvas']);
+            };
+            container.appendChild(item);
+        });
+    };
+    renderLegend(statsGlobalStd, stdDiv); renderLegend(statsGlobalCst, cstDiv);
+}
+
+// ================== 核心：无级缩放引擎 ==================
+function zoomCanvas(canvasId, delta) {
+    let z = currentZoom[canvasId] + delta;
+    if (z < 0.1) z = 0.1;
+    if (z > 5) z = 5;
+    applyZoom(canvasId, z);
+}
+
+function fitToScreen(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    const container = document.getElementById('scroll-' + canvasId);
+    
+    // 重置尺寸以获取真实宽高
+    canvas.style.width = '';
+    canvas.style.height = '';
+    
+    // 计算缩放比例：保留左右和上下各 15px 边距
+    const availableWidth = container.clientWidth - 30;
+    const availableHeight = container.clientHeight - 30;
+    
+    const scaleX = availableWidth / canvas.width;
+    const scaleY = availableHeight / canvas.height;
+    
+    // 取最小的比例，确保图纸完美塞入框内，并且最大不超过 100%
+    let z = Math.min(scaleX, scaleY);
+    if(z > 1) z = 1; 
+    
+    applyZoom(canvasId, z);
+}
+
+function applyZoom(canvasId, z) {
+    currentZoom[canvasId] = z;
+    const canvas = document.getElementById(canvasId);
+    
+    // 强制修改 CSS 宽高，配合 overflow: auto 实现完美滚动
+    canvas.style.width = (canvas.width * z) + 'px';
+    canvas.style.height = (canvas.height * z) + 'px';
+    
+    const textId = canvasId === 'standardCanvas' ? 'zoom-txt-standard' : 'zoom-txt-custom';
+    document.getElementById(textId).innerText = Math.round(z * 100) + '%';
+}
+
+// ================== 下载高清图纸 ==================
+function downloadCanvasWithLegend(canvasId, type, filename) {
+    const gridCanvas = document.getElementById(canvasId);
+    if(gridCanvas.width === 0) return alert("请先生成图纸！");
+    
+    const stats = type === 'standard' ? statsGlobalStd : statsGlobalCst;
+    const padding = 20; const itemW = 85; const itemH = 30;
+    
+    const finalWidth = Math.max(gridCanvas.width, 600);
+    const itemsPerRow = Math.max(1, Math.floor((finalWidth - padding * 2) / itemW));
+    const rows = Math.ceil(Object.keys(stats).length / itemsPerRow);
+    const legendHeight = rows * itemH + 60; 
+    
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = finalWidth;
+    tempCanvas.height = gridCanvas.height + legendHeight;
+    const ctx = tempCanvas.getContext('2d');
+    
+    ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    // 下载的始终是原始分辨率的图纸，不受网页缩放影响！
+    ctx.drawImage(gridCanvas, 0, 0);
+    
+    ctx.strokeStyle = '#EEEEEE'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(padding, gridCanvas.height + 10); ctx.lineTo(finalWidth - padding, gridCanvas.height + 10); ctx.stroke();
+    
+    ctx.fillStyle = '#333'; ctx.font = 'bold 16px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    const titleText = type === 'standard' ? "👑 所需色号清单 (全色库)" : "📦 所需色号清单 (我的库存限制)";
+    ctx.fillText(titleText, padding, gridCanvas.height + 25);
+    
+    ctx.font = '13px Arial';
+    Object.entries(stats).sort((a,b)=>b[1]-a[1]).forEach(([id, count], index) => {
+        const row = Math.floor(index / itemsPerRow);
+        const col = index % itemsPerRow;
+        const x = padding + col * itemW;
+        const y = gridCanvas.height + 60 + row * itemH;
+        
+        const hex = COLOR_DB.find(c=>c.id===id).hex;
+        ctx.fillStyle = hex; ctx.fillRect(x, y, 14, 14);
+        ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1; ctx.strokeRect(x, y, 14, 14);
+        ctx.fillStyle = '#333'; ctx.fillText(`${id} (${count})`, x + 22, y + 1);
+    });
+    
+    const link = document.createElement('a'); link.download = filename; link.href = tempCanvas.toDataURL('image/png'); link.click();
+}
+
+function generate() {
+    const upload = document.getElementById('upload').files[0];
+    if (!upload) return alert("请上传图片！");
+    if (myInventory.size === 0) return alert("库存为空！");
+    
+    const reader = new FileReader();
+    reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+            const gridW = parseInt(document.getElementById('gridSize').value);
+            const gridH = Math.round(gridW * (img.height / img.width));
+            const tmp = document.createElement('canvas'); tmp.width = gridW; tmp.height = gridH;
+            tmp.getContext('2d').drawImage(img, 0, 0, gridW, gridH);
+            const pixels = tmp.getContext('2d').getImageData(0, 0, gridW, gridH).data;
+           
+            const myColorsObj = COLOR_DB.filter(c => myInventory.has(c.id));
+            generatedData = { standard: [], custom: [], width: gridW, height: gridH };
+            for(let y=0; y<gridH; y++) {
+                for(let x=0; x<gridW; x++) {
+                    const i = (y * gridW + x) * 4;
+                    if(pixels[i+3] < 128) { generatedData.standard.push(null); generatedData.custom.push(null); continue; }
+                    generatedData.standard.push(getClosestColor(pixels[i], pixels[i+1], pixels[i+2], COLOR_DB));
+                    generatedData.custom.push(getClosestColor(pixels[i], pixels[i+1], pixels[i+2], myColorsObj));
+                }
+            }
+            
+            drawGrid('standardCanvas', generatedData.standard); 
+            drawGrid('customCanvas', generatedData.custom); 
+            buildLegend();
+            
+            // 生成后，延迟 10 毫秒自动计算并适应屏幕比例
+            setTimeout(() => {
+                fitToScreen('standardCanvas');
+                fitToScreen('customCanvas');
+            }, 10);
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(upload);
+}
+
+renderLists();
+</script>
+</body>
+</html>
